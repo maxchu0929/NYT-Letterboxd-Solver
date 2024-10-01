@@ -1,0 +1,113 @@
+---
+title: "New York Times Letterboxd Puzzle Solver"
+author: "Maxwell Chu"
+date: "2024-10-01"
+output: pdf_document
+---
+
+```{r}
+library(rvest)
+
+start_time <- Sys.time()
+
+words <- read.table("https://people.sc.fsu.edu/~jburkardt/datasets/words/anagram_dictionary.txt")
+words <- tolower(words[[1]]) # converts df to a vector
+
+html <- read_html("https://letterboxed.aliceyliang.com/populate")
+string <- strsplit(as.character(html), "")[[1]]
+
+CUSTOM_LETTERS <- tolower(paste(c(string[125:127], string[131:133], string[137:139], string[143:145]), collapse = ""))
+lets <- matrix(strsplit(CUSTOM_LETTERS, "")[[1]], 4, byrow = TRUE)
+lets_vec <- lets
+attributes(lets_vec) <- NULL
+
+make_visual <- function(lets) {
+  visual <- matrix(rep("", 25), 5)
+  visual[1, 2:4] <- lets[1, ]
+  visual[2:4, 5] <- lets[2, ]
+  visual[5, 2:4] <- lets[3, ]
+  visual[2:4, 1] <- lets[4, ]
+  noquote(visual)
+}
+
+message("TODAY'S LETTERS")
+make_visual(lets)
+message("\nBEST SOLUTIONS")
+
+check_spellable <- function(word) {
+  
+  is_spellable <- TRUE
+  split_word <- strsplit(word, "")[[1]]
+  
+  if(nchar(word) < 3) {
+    is_spellable <- FALSE
+  } else if(!all(split_word %in% lets_vec)) {
+    is_spellable <- FALSE
+  } else {
+    for(i in seq_len(4)) {
+      if(sum(diff(which(lets[i, ][1] == split_word | lets[i, ][2] == split_word | lets[i, ][3] == split_word)) == 1)) {
+        is_spellable <- FALSE
+      }
+    }
+  }
+  
+  is_spellable
+}
+
+for(i in seq_along(words)) {
+  if(!check_spellable(words[i]))
+    words[i] <- ""
+}
+
+spellable_words <- words[words != ""]
+one_word_solve <- character(0)
+
+for(i in seq_along(spellable_words)) {
+  if(all(lets_vec %in% strsplit(spellable_words[i], "")[[1]])) {
+    one_word_solve <- c(one_word_solve, spellable_words[i])
+  }
+}
+
+if(length(one_word_solve) != 0) {
+  message("ONE WORD SOLVE!")
+  noquote(one_word_solve)
+} else {
+  
+  word_lengths <- vapply(spellable_words, nchar, numeric(1), USE.NAMES = FALSE)
+  spellable_words <- spellable_words[rev(order(word_lengths))]
+  
+  second_pass <- function(first_word_split) {
+    
+    lets_remaining <- lets_vec[!(lets_vec %in% first_word_split)]
+    spellable_words_second <- spellable_words
+    
+    for(i in seq_along(spellable_words)) {
+      second_word_split <- strsplit(spellable_words[i], "")[[1]]
+      if(first_word_split[length(first_word_split)] != second_word_split[1] || !all(strsplit(lets_remaining, "")[[1]] %in% second_word_split) || !all(lets_vec %in% c(first_word_split, second_word_split)))
+        spellable_words_second[i] <- ""
+    }
+    
+    spellable_words_second <- spellable_words_second[spellable_words_second != ""]
+    spellable_words_second
+  }
+  
+  result_pairs_first <- character(0)
+  result_pairs_second <- character(0)
+  
+  for(i in seq_along(spellable_words)) {
+    first_word_split <- strsplit(spellable_words[i], "")[[1]]
+    spellable_words_second <- second_pass(first_word_split)
+    if(length(spellable_words_second != 0)) {
+      for(j in seq_along(spellable_words_second)) {
+        result_pairs_first <- c(result_pairs_first, spellable_words[i])
+        result_pairs_second <- c(result_pairs_second, spellable_words_second[j])
+      }
+    }
+  }
+  
+  result_pairs <- cbind(result_pairs_first, result_pairs_second)
+  noquote(result_pairs)
+}
+
+message("\nIt took ", round(as.numeric(Sys.time() - start_time), 3), " seconds to run this program")
+```
